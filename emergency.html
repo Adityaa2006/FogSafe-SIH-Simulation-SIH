@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FogSafe Emergency Operations</title><link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="emergency-page">
+<header class="emergency-header">
+  <div><div class="emergency-kicker">FOGSAFE • EMERGENCY OPERATIONS</div><h1>🚨 Emergency Operations Center</h1><p>Separate handling for Control Room emergencies and driver-originated emergency requests.</p></div>
+  <div class="emergency-clock"><b id="clock">--:--:--</b><a href="/">← Control Room</a></div>
+</header>
+<main class="emergency-main">
+  <section class="emergency-summary"><div><small>CONTROL EMERGENCY</small><strong id="controlState">NORMAL</strong></div><div><small>ACTIVE INCIDENTS</small><strong id="incidentCount">0</strong></div><div><small>FOG LEVEL</small><strong id="fog">CLEAR</strong></div><div><small>FLEET</small><strong id="fleet">0/0</strong></div></section>
+  <section class="emergency-ops-grid">
+    <article class="card emergency-command-card"><h2>🛑 Vehicle Emergency</h2><p>Activate an immediate stop for a specific vehicle.</p><div class="command-row"><select id="vehicle"></select><select id="vehicleEmergencyType"></select><input id="reason" placeholder="Optional details"><button class="danger-btn" onclick="controlEmergency()">ACTIVATE</button></div><div id="controlBox"></div><button class="resolve-btn all-ok-btn" onclick="allOk()">✓ ALL OK — CLEAR ALL EMERGENCIES</button></article>
+    <article class="card driver-request-card"><h2>📟 Driver-Originated Emergencies</h2><p>Driver distress requests appear here for Control Room acknowledgement.</p><div id="requests">No pending driver emergency requests.</div></article>
+  </section>
+  <section class="card incident-create-card">
+    <div class="card-title"><h2>🚨 Emergency / Disaster Simulator</h2><span class="mini">Landslide, flood, fire, rockfall and more</span></div>
+    <div class="command-row incident-row">
+      <select id="incidentType"></select>
+      <select id="incidentRoad"><option value="">Fleet / Site</option><option>ENTRY-N1</option><option>N1-N2</option><option>N1-N3</option><option>N2-N4</option><option>N2-N5</option><option>N3-N5</option><option>N4-N6</option><option>N5-N6</option><option>N6-PLANT</option><option>N5-PLANT</option></select>
+      <input id="incidentReason" placeholder="Optional incident details">
+      <button class="danger-btn" onclick="createIncident()">🚨 REPORT INCIDENT</button>
+    </div>
+    <p class="hint">A road-based incident blocks that road, alerts connected vehicles and forces A* route recalculation. It does not freeze the whole fleet.</p>
+  </section>
+  <section class="card active-incidents-card"><div class="card-title"><h2>Active Incidents</h2><span class="mini">Real-time response</span></div><div id="incidents" class="emergency-grid"></div></section>
+  <section class="card emergency-log"><h2>Emergency Event Log</h2><div id="log"></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+async function post(url,body={}){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error(await r.text());return r.json()}
+function fillEmergencyTypes(d){
+ const types=d.emergency_types||{};
+ const vehicleSel=$('vehicleEmergencyType'), incidentSel=$('incidentType');
+ vehicleSel.innerHTML=Object.entries(types).map(([k,v])=>`<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+ incidentSel.innerHTML=Object.entries(types).map(([k,v])=>`<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+}
+async function controlEmergency(){try{const type=$('vehicleEmergencyType').value;const d=currentState;const t=d.emergency_types[type];await post('/api/emergency/control',{vehicle:$('vehicle').value,reason:`${t.label}${$('reason').value?' — '+$('reason').value:''}`,type});$('reason').value='';refresh()}catch(e){alert(e.message)}}
+async function createIncident(){try{await post('/api/emergency/incident',{type:$('incidentType').value,road:$('incidentRoad').value,reason:$('incidentReason').value});$('incidentReason').value='';refresh()}catch(e){alert(e.message)}}
+async function clearIncident(id){try{await post('/api/emergency/incident/clear/'+id,{});refresh()}catch(e){alert(e.message)}}
+async function allOk(){try{await post('/api/emergency/all-ok',{});refresh()}catch(e){alert(e.message)}}
+async function clearOne(id){try{await post('/api/emergency/clear/'+id,{});refresh()}catch(e){alert(e.message)}}
+let currentState=null,typesReady=false;
+async function refresh(){try{const r=await fetch('/api/state');const d=await r.json();currentState=d;if(!typesReady){fillEmergencyTypes(d);typesReady=true;}
+ const e=d.emergency||{};$('controlState').textContent=e.active?`${e.vehicle?e.vehicle+' • ':''}${e.source||'ACTIVE'}`:'NORMAL';$('controlState').className=e.active?'critical':'';$('incidentCount').textContent=(d.incidents||[]).filter(x=>x.active).length;$('fog').textContent=d.fog.toUpperCase();$('fleet').textContent=Object.values(d.vehicles).filter(v=>v.connected).length+'/'+Object.keys(d.vehicles).length;
+ const sel=$('vehicle'),old=sel.value;sel.innerHTML=Object.keys(d.vehicles).map(id=>`<option value="${id}">${id} — ${esc(d.vehicles[id].driver.name)}</option>`).join('');if(old&&[...sel.options].some(o=>o.value===old))sel.value=old;
+ $('controlBox').innerHTML=e.active?`<div class="emergency-control-active"><b>🚨 EMERGENCY ACTIVE</b><span>${esc(e.vehicle||'Fleet / Site')} • ${esc(e.reason||'')}</span></div>`:`<div class="ok">🟢 No vehicle Control Room emergency is active.</div>`;
+ const pending=(d.driver_emergency_requests||[]).filter(x=>!x.handled);$('requests').innerHTML=pending.length?pending.map(x=>`<div class="driver-emergency-request"><div><b>🚨 ${esc(x.vehicle)} • ${esc(x.driver)}</b><small>${esc(x.time)}</small><p>${esc(x.reason)}</p></div><button class="resolve-btn" onclick="clearOne('${x.vehicle}')">✓ ALL OK</button></div>`).join(''):'<div class="ok">🟢 No pending driver emergency requests.</div>';
+ const active=(d.incidents||[]).filter(x=>x.active);$('incidents').innerHTML=active.length?active.map(x=>`<article class="incident-card"><div class="incident-top"><span>${x.icon} ${esc(x.type.toUpperCase())}</span><b>${esc(x.severity)}</b></div><h2>${esc(x.label)}</h2><p>${esc(x.reason)}</p><div class="incident-metrics"><span>LOCATION<b>${esc(x.road)}</b></span><span>TIME<b>${esc(x.time)}</b></span><span>STATUS<b>ACTIVE</b></span><span>ACTION<b>ROUTE / RESPONSE</b></span></div><div class="incident-action">${esc(x.action)}</div><button class="resolve-btn" style="margin-top:12px" onclick="clearIncident(${x.id})">✓ RESOLVE INCIDENT</button></article>`).join(''):'<div class="no-incident">🟢 No active emergency incidents</div>';
+ $('log').innerHTML=d.events.filter(x=>['DRIVER_EMERGENCY','CONTROL_EMERGENCY','EMERGENCY_CLEAR','EMERGENCY_INCIDENT','EMERGENCY_INCIDENT_CLEAR','AI_EMERGENCY','AI_EMERGENCY_CLEAR','TRAFFIC_YIELD'].includes(x.kind)).slice(0,20).map(x=>`<div class="event"><span>${esc(x.time)}</span><b>${esc(x.kind)}</b>${esc(x.message)}</div>`).join('')||'<p class="hint">No emergency events.</p>';
+ }catch(e){console.error(e)}}
+function clock(){$('clock').textContent=new Date().toLocaleTimeString()} setInterval(refresh,500);setInterval(clock,1000);clock();refresh();
+</script>
+</body></html>

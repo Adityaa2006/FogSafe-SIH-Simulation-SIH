@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FogSafe Control Room</title><link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div><h1>FogSafe <span>CONTROL ROOM</span></h1><p>AI-powered fog monitoring • vehicle health • V2V collision prevention • route optimization</p></div>
+  <div class="top-right"><a class="nav-link" href="/driver">🚛 Driver Dashboard</a><a class="nav-link emergency-link" href="/emergency">🚨 Emergency Command</a><span id="systemState" class="pill online">● LIVE</span><span id="clock"></span></div>
+</header>
+
+<section class="toolbar">
+  <div><b>FOG SENSOR</b>
+    <span id="fogSensorReadout" class="pill online">SCORE -- • AUTO</span>
+    <button id="fogAutoBtn" onclick="toggleFogAuto()">AUTO: ON</button>
+    <span class="mini" style="margin:0 6px">Manual override:</span>
+    <button onclick="setFog('clear')">CLEAR</button><button onclick="setFog('moderate')">MODERATE</button>
+    <button onclick="setFog('dense')">DENSE</button><button onclick="setFog('critical')">CRITICAL</button>
+  </div>
+  <div><b>SIMULATION</b><button id="pauseBtn" onclick="toggleSimulation()">Pause</button>
+    <button onclick="resetAll()">Reset</button><button onclick="addHazard('N2','N4')">Block N2–N4</button><button onclick="clearHazards()">Clear Hazards</button>
+  </div>
+</section>
+
+<section class="kpis">
+  <div class="kpi"><small>ACTIVE VEHICLES</small><strong id="kActive">0</strong><span>connected units</span></div>
+  <div class="kpi"><small>SAFE / CAUTION</small><strong id="kSafe">0 / 0</strong><span>current risk band</span></div>
+  <div class="kpi"><small>HIGH / CRITICAL</small><strong id="kRisk">0 / 0</strong><span>requires attention</span></div>
+  <div class="kpi"><small>V2V LINKS</small><strong id="kV2V">0</strong><span>vehicle-to-vehicle</span></div>
+  <div class="kpi"><small>ROAD HAZARDS</small><strong id="kHazards">0</strong><span>route restrictions</span></div>
+</section>
+
+<main>
+<section class="card map-card">
+  <div class="card-title"><h2>Live Mine Map</h2><span class="mini">Green route • Red hazard • dashed links = V2V</span></div>
+  <svg id="mineMap" viewBox="0 0 900 500"></svg>
+</section>
+
+<section class="card ai-card"><div class="card-title"><h2>🤖 AI Safety Engine</h2><span class="mini">Automatic emergency protection</span></div><div id="aiSafetyStatus" class="ai-safety-ready">MONITORING</div><p id="aiSafetyInfo" class="hint">AI monitors collision risk, opposite-direction traffic and critical fog conditions. Automatic emergency activates only at critical thresholds.</p></section>
+
+<section class="card env-card"><h2>Environment</h2>
+  <div id="fogBadge" class="fog clear">CLEAR</div>
+  <div class="metric-row"><span>Fog sensor score</span><b id="fogSensorScore">0 / 100</b></div>
+  <div class="metric-row"><span>Detection mode</span><b id="fogModeLabel">AUTO</b></div>
+  <div class="metric-row"><span>Safe speed</span><b id="safeSpeed">30 km/h</b></div>
+  <div class="metric-row"><span>Following distance</span><b id="followDistance">12 m</b></div>
+  <div class="metric-row"><span>System</span><b id="simStatus">RUNNING</b></div>
+  <hr><p class="hint">Risk combines fog, speed, distance, communication, vehicle condition and fuel/battery.</p>
+</section>
+
+<section class="card vehicles-card"><div class="card-title"><h2>Vehicle Fleet</h2><span class="mini">Click a vehicle</span></div>
+<table><thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Speed</th><th>Node</th><th>Risk</th><th>Link</th></tr></thead>
+<tbody id="vehicleTable"></tbody></table></section>
+
+<section class="card selected-card"><h2>Vehicle Control</h2><div id="selectedPanel"></div></section>
+
+<section class="card emergency-control-card">
+  <div class="card-title"><h2>🚨 Emergency Control Room</h2><span class="mini">Control Room authority</span></div>
+  <div id="emergencyControl"></div>
+  <div id="driverEmergencyRequests" class="driver-request-list"></div>
+</section>
+<section class="card emergency-control-card incident-quick-card">
+  <div class="card-title"><h2>🚨 Quick Emergency / Disaster Test</h2><a class="nav-link" href="/emergency">Open Emergency Center</a></div>
+  <div class="command-row incident-quick-row">
+    <select id="quickIncidentType"><option value="landslide">⛰️ Landslide</option><option value="flood">🌊 Flooded Road</option><option value="rockfall">🪨 Rockfall</option><option value="fire">🔥 Fire</option><option value="breakdown">🔧 Vehicle Breakdown</option><option value="medical">🚑 Medical Emergency</option><option value="road_obstruction">🚧 Road Obstruction</option><option value="severe_fog">🌫️ Severe Fog</option><option value="collision">💥 Vehicle Collision</option></select>
+    <select id="quickIncidentRoad"><option value="N2-N4">N2–N4</option><option value="N1-N2">N1–N2</option><option value="N1-N3">N1–N3</option><option value="N2-N5">N2–N5</option><option value="N3-N5">N3–N5</option><option value="N4-N6">N4–N6</option><option value="N5-N6">N5–N6</option><option value="N6-PLANT">N6–PLANT</option><option value="N5-PLANT">N5–PLANT</option><option value="ENTRY-N1">ENTRY–N1</option></select>
+    <input id="quickIncidentReason" placeholder="Optional details">
+    <button class="danger-btn" onclick="quickIncident()">REPORT</button>
+  </div>
+  <div id="quickIncidents" class="incident-mini-list"></div>
+</section>
+
+<section class="card v2v-card"><div class="card-title"><h2>V2V Network</h2><button onclick="connectV2V()">+ Link</button></div>
+<div id="v2vInfo"></div><div class="message-form">
+<select id="msgFrom"></select><select id="msgTo"></select><select id="msgLevel"><option value="WARN">IMPORTANT / WARN</option><option value="CRITICAL">CRITICAL</option><option value="INFO">INFO ONLY</option></select><input id="msgText" placeholder="Broadcast safety message"><button onclick="sendMessage()">Send</button></div>
+<div id="messages" class="messages"></div></section>
+
+<section class="card alerts-card"><div class="card-title"><h2>Alert Queue</h2><span class="mini">Real-time</span></div><div id="alerts"></div></section>
+
+<section class="card route-card"><h2>Route Intelligence</h2><div id="routeInfo"></div></section>
+
+<section class="card events-card"><h2>Control Room Event Log</h2><div id="events"></div></section>
+</main>
+
+<div id="connectionLostPopup" class="connection-lost-popup" aria-hidden="true">
+ <div class="connection-popup-box">
+  <div class="popup-icon">📡</div><div class="popup-title">VEHICLE COMMUNICATION LOST</div>
+  <div class="popup-vehicle" id="lostVehicle">V01</div>
+  <p>Control Room has lost telemetry from this vehicle.</p>
+  <div class="last-info-box" id="lostLastInfo">Last known information unavailable.</div>
+  <div class="popup-focus">Use the last known information for tracking and recovery decisions. No new telemetry is available until communication is restored.</div>
+  <div class="popup-actions"><button onclick="closeConnectionLostPopup()">Acknowledge</button></div>
+ </div>
+</div>
+
+<div id="driverEmergencyPopup" class="driver-emergency-popup" aria-hidden="true">
+ <div class="driver-popup-box">
+  <div class="popup-icon">🚨</div><div class="popup-title">DRIVER EMERGENCY REQUEST</div>
+  <div class="popup-vehicle" id="popupVehicle">V01</div><div class="popup-driver" id="popupDriver">Driver</div>
+  <p id="popupReason">Emergency request received from driver.</p>
+  <div class="popup-focus">Immediately contact the driver, assess the situation and take control-room action.</div>
+  <div class="popup-actions"><button onclick="closeDriverEmergencyPopup()">View Dashboard</button><button class="resolve-btn" onclick="acknowledgeDriverEmergency(document.getElementById('popupVehicle').textContent)">✓ ALL OK</button></div>
+ </div>
+</div>
+<script src="/static/simulation.js"></script>
+</body></html>

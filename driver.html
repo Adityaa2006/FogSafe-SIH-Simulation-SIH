@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>FogSafe Driver Dashboard</title><link rel="stylesheet" href="/static/style.css"></head>
+<body class="driver-page">
+<header><div><h1>FogSafe <span>TRUCK / DRIVER DASHBOARD</span></h1><p>Driver safety console • vehicle telemetry • V2V warnings • route guidance</p></div><div class="top-right"><button id="voiceToggle" class="voice-toggle" onclick="toggleVoice()" title="Automatic spoken safety alerts">🔊 Voice ON</button><label class="language-picker">🌐 <select id="languageSelect" onchange="lang=this.value;localStorage.setItem('fogsafe-driver-language',lang);applyLanguage();render()"><option value="en">English</option><option value="hi">हिन्दी</option><option value="mr">मराठी</option></select></label><a class="nav-link" href="/" data-i18n="control">Control Room</a><a class="nav-link emergency-link" href="/emergency">🚨 <span data-i18n="emergencyDash">Emergency</span></a><span id="clock"></span></div></header>
+<section class="driver-toolbar"><label><span data-i18n="vehicle">MY VEHICLE</span> <select id="vehicleSelect"></select></label><button onclick="setStatus('MOVING')">▶ <span data-i18n="start">Start / Move</span></button><button onclick="setStatus('STOPPED')">■ <span data-i18n="stop">Stop</span></button><button onclick="setStatus('IDLE')">Ⅱ <span data-i18n="idle">Idle</span></button><button class="danger-btn" onclick="openEmergencyModal()">🚨 <span data-i18n="emergency">EMERGENCY</span></button></section>
+<main class="driver-grid">
+<section class="card driver-hero"><div class="driver-id"><div><small data-i18n="driver">DRIVER</small><h2 id="driverName">—</h2><p id="driverMeta">—</p></div><div id="statusBadge" class="status-badge">—</div></div><div class="driver-stats"><div><small data-i18n="truck">TRUCK</small><b id="truckId">—</b></div><div><small data-i18n="type">TYPE</small><b id="truckType">—</b></div><div><small data-i18n="speed">SPEED</small><b id="speed">—</b></div><div><small data-i18n="location">LOCATION</small><b id="location">—</b></div></div></section>
+<section class="card safety-card"><h2 data-i18n="safety">Safety Score</h2><div id="riskScore" class="risk-number">—</div><div id="riskBand" class="risk-band">—</div><p id="safetyAdvice" class="hint">—</p></section>
+<section class="card fog-driver-card"><h2 data-i18n="fog">🌫️ Live Fog Conditions</h2><div id="driverFog" class="fog clear">CLEAR</div><div class="metric-row"><span data-i18n="safeSpeed">Safe speed</span><b id="driverSafeSpeed">30 km/h</b></div><div class="metric-row"><span data-i18n="follow">Recommended following distance</span><b id="driverFollow">12 m</b></div><p id="fogAdvice" class="hint">—</p></section>
+<section class="card telemetry"><h2 data-i18n="health">Truck Health</h2><div class="health"><span data-i18n="fuel">Fuel</span><div class="bar"><i id="fuelBar"></i></div><b id="fuel">—</b></div><div class="health"><span data-i18n="battery">Battery</span><div class="bar"><i id="batteryBar"></i></div><b id="battery">—</b></div><div class="metric-row"><span data-i18n="communication">Communication</span><b id="comm">—</b></div><div class="metric-row"><span data-i18n="destination">Destination</span><b id="destination">—</b></div></section>
+<section class="card route-driver"><h2 data-i18n="route">Route Guidance</h2><div id="driverRoute" class="route-path">—</div><p class="hint" data-i18n="routeHint">Safest available route considers fog and road hazards.</p></section>
+<section class="card v2v-driver"><h2 data-i18n="v2v">Nearby V2V Connections</h2><div id="myLinks">—</div><h3 data-i18n="messages">Safety Messages</h3><div id="myMessages" class="messages">—</div></section>
+<section class="card driver-request-card">
+<h2>🚨 Driver Emergency Panel</h2><div id="driverEmergencyStatus" class="driver-emergency-status normal">NORMAL</div>
+<p class="hint">Use only for a genuine emergency. Your request is sent immediately to the Control Room. Stay focused and follow Control Room orders. Important Control Room messages are also spoken automatically in your selected language.</p>
+<button class="danger-btn driver-emergency-large" onclick="openEmergencyModal()">🚨 SEND EMERGENCY TO CONTROL ROOM</button>
+</section>
+<section class="card driver-alerts"><h2 data-i18n="alerts">Driver Alerts</h2><div id="driverAlerts">—</div></section>
+</main>
+<div id="messageOverlay" class="message-overlay" aria-hidden="true"><div class="message-overlay-box"><div class="overlay-icon">📡</div><div class="overlay-label" data-i18n="controlMessage">CONTROL ROOM MESSAGE</div><div id="overlayMessage" class="overlay-message">—</div><div id="overlayMeta" class="overlay-meta">—</div><div class="overlay-progress"><i></i></div><button onclick="closeMessageOverlay()" data-i18n="ack">Acknowledge</button></div></div>
+<div id="emergencyOverlay" class="emergency-driver-overlay" aria-hidden="true"><div class="driver-emergency-box"><div class="big-emergency">🚨</div><div class="driver-emergency-title" data-i18n="emergencyActive">EMERGENCY ACTIVE</div><div id="emergencyVehicleText">STOP VEHICLE</div><p id="emergencyAdvice">Stay focused and follow Control Room orders.</p><p class="emergency-focus">🧠 <span data-i18n="focus">Stay focused and follow Control Room orders.</span></p></div></div>
+
+<div id="driverEmergencyInput" class="driver-emergency-input" aria-hidden="true">
+  <div class="driver-emergency-input-box">
+    <div class="popup-icon">🆘</div>
+    <div class="popup-title">DRIVER EMERGENCY</div>
+    <h2 id="emergencyCountdownTitle">Emergency request</h2>
+    <p>Enter a short reason and send it to the Control Room. If you cannot complete the manual request within <b id="emergencyCountdown">3</b> seconds, FogSafe will automatically send an emergency request for you.</p>
+    <input id="driverEmergencyReason" type="text" maxlength="180" placeholder="Emergency reason (optional)">
+    <div class="emergency-input-actions">
+      <button class="resolve-btn" onclick="submitManualEmergency()">🚨 SEND MANUAL EMERGENCY</button>
+      <button onclick="cancelEmergencyModal()">Cancel</button>
+    </div>
+    <div class="emergency-fallback-note">⚡ Automatic fallback is a driver safety backup. Stay focused and follow Control Room orders.</div>
+  </div>
+</div>
+<script src="/static/driver.js"></script>
+<script>applyLanguage();</script>
+</body></html>

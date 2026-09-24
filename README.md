@@ -1,5 +1,17 @@
+
 # FogSafe SIH Simulation v8 – Smart Emergency Workflow
 
+🚀 Live Demo
+
+Experience the FogSafe – SIH Simulation live:
+
+👉 "Open Live Demo" ((https://fogsafe-sih-simulation-sih.onrender.com/))
+
+«The application is deployed on Render. The free hosting service may put the application to sleep after a period of inactivity, so the first request may take a short time to load.»
+
+🔗 Project Repository
+
+👉 "GitHub Repository" (https://github.com/Adityaa2006/FogSafe-SIH-Simulation-SIH)
 ## Run
 ```powershell
 cd fogsafe
